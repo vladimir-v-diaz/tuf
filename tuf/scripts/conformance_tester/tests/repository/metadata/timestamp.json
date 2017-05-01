@@ -1,12 +1,18 @@
 {
- "signatures": [],
+ "signatures": [
+  {
+   "keyid": "3f09f6468a522bea0364a23315872d8400875dfdb24ff4ecd32f27164d5c23c1",
+   "method": "ed25519",
+   "sig": "d44defa443b25bf4d34a5aa4c8e4d63e7f2afa24ae5ac76ed3475d3a24cdba17d0384a751cebb15b94e18c297fe01c5fb6d6441f2617e8d89573d6f27aac6506"
+  }
+ ],
  "signed": {
   "_type": "Timestamp",
   "expires": "2030-01-01T00:00:00Z",
   "meta": {
    "snapshot.json": {
     "hashes": {
-     "sha256": "c15b14217a3ad50ae2c136109983b7269d3bda42c4e1e530e30e7b5854b53a11"
+     "sha256": "5429cb36aa60a0a4e4d4ebe06cb8b1e4e2ec22e0535c17096bfaf8fd187204e4"
     },
     "length": 678,
     "version": 1
