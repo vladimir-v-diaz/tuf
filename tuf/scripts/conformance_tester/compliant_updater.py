@@ -120,7 +120,7 @@ def update_client(target, repository_mirror, metadata_directory, targets_directo
       ' formatted, which prevents initialization of the updater.')
 
   # Set the local repository directory containing all of the metadata files.
-  tuf.settings.repository_directory = metadata_directory
+  tuf.settings.repositories_directory = metadata_directory
 
   # Set the repository mirrors.  This dictionary is needed by the Updater
   # class of updater.py.
