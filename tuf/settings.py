@@ -79,7 +79,8 @@ DEFAULT_TARGETS_REQUIRED_LENGTH = 5000000 #bytes
 SOCKET_TIMEOUT = 2 #seconds
 
 # The maximum chunk of data, in bytes, we would download in every round.
-CHUNK_SIZE = 8192 #bytes
+#CHUNK_SIZE = 8192 #bytes
+CHUNK_SIZE = 80192 #bytes
 
 # The minimum average download speed (bytes/second) that must be met to
 # avoid being considered as a slow retrieval attack.
