@@ -11,3 +11,4 @@ omit =
     # Command-line scripts.
     */tuf/scripts/client.py
     */tuf/scripts/repo.py
+    */tuf/scripts/simple_server.py
