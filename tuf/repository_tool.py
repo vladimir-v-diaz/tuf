@@ -479,8 +479,8 @@ class Repository(object):
         a file extension nor prepended consistent hash.
 
     <Exceptions>
-      tuf.exceptions.FormatError, if any of the arguments are improperly
-      formatted.
+      securesystemslib.exceptions.FormatError, if any of the arguments are
+      improperly formatted.
 
     <Side Effects>
       None.
@@ -511,8 +511,8 @@ class Repository(object):
         'metadata' must conform to tuf.formats.SIGNABLE_SCHEMA.
 
     <Exceptions>
-      tuf.exceptions.FormatError, if any of the arguments are improperly
-      formatted.
+      securesystemslib.exceptions.FormatError, if any of the arguments are
+      improperly formatted.
 
     <Side Effects>
       None.
@@ -529,7 +529,51 @@ class Repository(object):
 
 
 
-  def add_verification_key(publickey, rolename):
+  def add_verification_key(publickey, rolename, expires=None):
+    """
+    <Purpose>
+      Add a verification/public key for 'rolename'.  This is the public key
+      that 'rolename' is trusted to use when signing its metadata.  Adding a
+      key, which should contain only the public portion, determines the
+      corresponding private key and signatures 'rolename' is expected to
+      provide.  A threshold of signatures is required for a role to be
+      considered properly signed.  If a metadata file contains an insufficient
+      threshold of signatures, it must not be accepted by the client.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      publickey:
+        The verification key for 'rolename'.  It is conformant to
+        'securesystemslib.formats.ANYKEY_SCHEMA'.  Adding a public key to a
+        role means that its corresponding private key must be used to generate
+        and add a signature to the role.  A threshold number of signatures is
+        required for a role to be fully signed.
+
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+      expires:
+        The date in which 'publickey' expires.  'expires' is a
+        datetime.datetime() object.
+
+    <Exceptions>
+      securesystemslib.exceptions.FormatError, if any of the arguments are
+      improperly formatted.
+
+      securesystemslib.exceptions.Error, if 'expires' has already expired.
+
+    <Side Effects>
+      'rolename's entries in 'tuf.keydb.py' and 'tuf.roledb.py' are
+      updated.
+
+    <Returns>
+      None.
+    """
+
     pass
 
 
