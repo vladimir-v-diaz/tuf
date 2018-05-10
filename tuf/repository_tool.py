@@ -449,8 +449,8 @@ class Repository(object):
 
     <Arguments>
       roles:
-        A list of roles to mark as dirty.  on the next write, these roles
-        will be written to disk.
+        A list of roles to mark as dirty.  On the next write, these roles will
+        be written to disk.
 
     <Exceptions>
       None.
@@ -463,6 +463,78 @@ class Repository(object):
     """
 
     tuf.roledb.unmark_dirty(roles, self._repository_name)
+
+
+
+  def get_metadata(rolename):
+    """
+    <Purpose>
+      Get the metadata for 'rolename'.  The object returned conforms to
+      tuf.formats.SIGNABLE_SCHEMA, which matches the format of metadata written
+      to disk.
+
+    <Arguments>
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the role, without
+        a file extension nor prepended consistent hash.
+
+    <Exceptions>
+      tuf.exceptions.FormatError, if any of the arguments are improperly
+      formatted.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      The metadata belonging to 'rolename', conformant to
+      tuf.formats.SIGNABLE_SCHEMA.
+    """
+
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+
+    return roleinfo['metadata']
+
+
+
+  def update_metadata(rolename, metadata):
+    """
+    <Purpose>
+      Update the metadata for 'rolename'.
+
+    <Arguments>
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+      metadata:
+        The metadata belonging to 'rolename' that needs to be updated.
+        'metadata' must conform to tuf.formats.SIGNABLE_SCHEMA.
+
+    <Exceptions>
+      tuf.exceptions.FormatError, if any of the arguments are improperly
+      formatted.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+    """
+
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+    roleinfo['metadata'] = metadata_signable
+
+    tuf.roledb.update_roleinfo(rolename, roleinfo, mark_role_as_dirty=True,
+        repository_name=self._repository_name)
+
+
+
+  def add_verification_key(publickey, rolename):
+    pass
+
+
+  def load_signing_key(privatekey, rolename):
+    pass
 
 
 
