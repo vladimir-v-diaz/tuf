@@ -577,7 +577,42 @@ class Repository(object):
     pass
 
 
+
   def load_signing_key(privatekey, rolename):
+    """
+    <Purpose>
+      Load the signing/private key of 'rolename' so that signatures can be
+      generated when the role's metadata file is eventually written to disk.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      privatekey:
+        'rolename's private key, conformant to
+        'securesystemslib.formats.ANYKEY_SCHEMA'.  It must contain the private
+        key so that role signatures may be generated when writeall() or write()
+        is eventually called to generate valid metadata files.
+
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+    <Exceptions>
+      securesystemslib.exceptions.FormatError, if 'privatekey' is improperly
+      formatted.
+
+      securesystemslib.exceptions.Error, if 'privatekey' does not contain
+      a valid private key.
+
+    <Side Effects>
+      Updates 'rolename's entries in 'tuf.keydb.py' and 'tuf.roledb.py'.
+
+    <Returns>
+      None.
+    """
+
     pass
 
 
