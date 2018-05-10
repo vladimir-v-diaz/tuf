@@ -319,6 +319,12 @@ ROLEDB_SCHEMA = SCHEMA.Object(
   delegations = SCHEMA.Optional(DELEGATIONS_SCHEMA),
   partial_loaded = SCHEMA.Optional(BOOLEAN_SCHEMA))
 
+# A signable object.  Holds the signing role and its associated signatures.
+SIGNABLE_SCHEMA = SCHEMA.Object(
+  object_name = 'SIGNABLE_SCHEMA',
+  signed = SCHEMA.Any(),
+  signatures = SCHEMA.ListOf(securesystemslib.formats.SIGNATURE_SCHEMA))
+
 # New roledb version...
 ROLEDB_SCHEMA = SCHEMA.Object(
   object_name = 'ROLEDB_SCHEMA',
@@ -326,12 +332,6 @@ ROLEDB_SCHEMA = SCHEMA.Object(
   signing_keyids = KEYIDS_SCHEMA,
   partially_loaded = BOOLEAN_SCHEMA)
   #previous_keyids = SCHEMA.Optional(KEYIDS_SCHEMA),
-
-# A signable object.  Holds the signing role and its associated signatures.
-SIGNABLE_SCHEMA = SCHEMA.Object(
-  object_name = 'SIGNABLE_SCHEMA',
-  signed = SCHEMA.Any(),
-  signatures = SCHEMA.ListOf(securesystemslib.formats.SIGNATURE_SCHEMA))
 
 # Root role: indicates root keys and top-level roles.
 ROOT_SCHEMA = SCHEMA.Object(
