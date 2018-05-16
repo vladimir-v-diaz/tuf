@@ -684,13 +684,43 @@ class Repository(object):
       a valid private key.
 
     <Side Effects>
-      Updates 'rolename's entries in 'tuf.keydb.py' and 'tuf.roledb.py'.
+      Updates 'rolename's entry in 'tuf.keydb.py' and 'tuf.roledb.py'.
 
     <Returns>
       None.
     """
 
-    pass
+    # Do the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.  Raise
+    # 'securesystemslib.exceptions.FormatError' if any are improperly formatted.
+    securesystemslib.formats.ANYKEY_SCHEMA.check_match(privatekey)
+    securesystemslib.formats.NAME_SCHEMA.check_match(rolename)
+
+    # Ensure the private portion of the key is available, otherwise signatures
+    # cannot be generated when the metadata file is written to disk.
+    if 'private' not in privatekey['keyval'] or not len(privatekey['keyval']['private']):
+      raise securesystemslib.exceptions.Error(
+          'The key object does not contain the required "private"'
+          ' portion:' + repr(privatekey))
+
+    # Has the key, with the private portion included, been added to the keydb?
+    # The public version of the key may have been previously added, so it
+    # should replaced with the private version.
+    try:
+      tuf.keydb.add_key(privatekey, repository_name=self._repository_name)
+
+    except securesystemslib.exceptions.KeyAlreadyExistsError:
+      tuf.keydb.remove_key(privatekey['keyid'], self._repository_name)
+      tuf.keydb.add_key(privatekey, repository_name=self._repository_name)
+
+    # Update the role's 'signing_keys' field in 'tuf.roledb.py'.
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+    if privatekey['keyid'] not in roleinfo['signing_keyids']:
+      roleinfo['signing_keyids'].append(privatekey['keyid'])
+
+
+
 
 
 
