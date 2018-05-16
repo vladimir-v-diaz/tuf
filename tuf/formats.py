@@ -330,12 +330,12 @@ ROLEDB_SCHEMA = SCHEMA.Object(
   object_name = 'ROLEDB_SCHEMA',
   metadata = SIGNABLE_SCHEMA,
   signing_keyids = KEYIDS_SCHEMA,
-  partially_loaded = BOOLEAN_SCHEMA)
+  partially_loaded = BOOLEAN_SCHEMA,
   # The following attributes might be removed in the future, their
   # corresponding values accessed from metadata instead of being stored here in
   # the roledb object.
   keyids = SCHEMA.Optional(KEYIDS_SCHEMA),
-  previous_keyids = SCHEMA.Optional(KEYIDS_SCHEMA),
+  previous_keyids = SCHEMA.Optional(KEYIDS_SCHEMA))
 
 # Root role: indicates root keys and top-level roles.
 ROOT_SCHEMA = SCHEMA.Object(
