@@ -955,6 +955,64 @@ class Repository(object):
 
 
 
+  def remove_target(filepath, rolename):
+    """
+    <Purpose>
+      Remove the 'filepath' target from 'rolename's metadata.  'filepath' is
+      relative to the targets directory.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      filepath:
+        The target to remove from 'rolename's metadata.  The file path should
+        be relative to the repository's targets directory.
+
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+    <Exceptions>
+      securesystemslib.exceptions.FormatError, if any of the arguments are
+      improperly formatted.
+
+      securesystemslib.exceptions.Error, if 'filepath' is not located in the
+      repository's targets directory, not found, or if 'rolename' is a
+      non-Targets role.
+
+    <Side Effects>
+      Modifies 'rolename's metadata in 'tuf.roledb.py'.
+
+    <Returns>
+      None.
+    """
+
+    # Do the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.  Raise
+    # 'securesystemslib.exceptions.FormatError' if there is a mismatch.
+    securesystemslib.formats.RELPATH_SCHEMA.check_match(filepath)
+    securesystemslib.formats.NAME_SCHEMA.check_match(rolename)
+
+    if rolename in ['root', 'snapshot', 'timestamp']:
+      raise securesystemslib.exceptions.Error(
+          'The given rolename is a non-Targets role: ' + repr(rolename))
+
+    # Remove 'relative_filepath', if found, and update its metadata.
+    fileinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+    if filepath in fileinfo['metadata']['targets']:
+      del fileinfo['metadata']['targets'][filepath]
+      tuf.roledb.update_roleinfo(self.rolename, fileinfo,
+          repository_name=self._repository_name)
+
+    else:
+      raise securesystemslib.exceptions.Error(
+          'Target file path not found: ' + repr(filepath))
+
+
+
   def clear_targets(rolename):
     """
     <Purpose>
