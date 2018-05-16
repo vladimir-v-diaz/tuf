@@ -473,6 +473,9 @@ class Repository(object):
       tuf.formats.SIGNABLE_SCHEMA, which matches the format of metadata written
       to disk.
 
+      >>>
+      >>>
+
     <Arguments>
       rolename:
         The rolename (e.g., 'root', 'my_role', 'targets') of the role, without
@@ -574,7 +577,81 @@ class Repository(object):
       None.
     """
 
-    pass
+    # Do the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.  Raise
+    # 'securesystemslib.exceptions.FormatError' if any are improperly formatted.
+    securesystemslib.formats.ANYKEY_SCHEMA.check_match(publickey)
+    securesystemslib.formats.NAME_SCHEMA.check_match(rolename)
+
+    # If 'expires' is unset, choose a default expiration for 'publickey'.  By
+    # default, Root, Targets, Snapshot, and Timestamp keys are set to expire 1
+    # year, 3 months, 1 week, and 1 day from the current time, respectively.
+    if expires is None:
+      if rolename == 'root':
+        expires = tuf.formats.unix_timestamp_to_datetime(
+            int(time.time() + ROOT_EXPIRATION))
+
+      elif rolename == 'targets':
+        expires = tuf.formats.unix_timestamp_to_datetime(
+            int(time.time() + TARGETS_EXPIRATION))
+
+      elif rolename == 'snapshot':
+        expires = tuf.formats.unix_timestamp_to_datetime(
+            int(time.time() + SNAPSHOT_EXPIRATION))
+
+      elif rolename == 'timestamp':
+        expires = tuf.formats.unix_timestamp_to_datetime(
+            int(time.time() + TIMESTAMP_EXPIRATION))
+
+      else:
+        expires = tuf.formats.unix_timestamp_to_datetime(
+            int(time.time() + TIMESTAMP_EXPIRATION))
+
+    # Is 'expires' a datetime.datetime() object?
+    # Raise 'securesystemslib.exceptions.FormatError' if not.
+    if not isinstance(expires, datetime.datetime):
+      raise securesystemslib.exceptions.FormatError(
+          repr(expires) + ' is not a datetime.datetime() object.')
+
+    # Truncate the microseconds value to produce a correct schema string
+    # of the form 'yyyy-mm-ddThh:mm:ssZ'.
+    expires = expires.replace(microsecond = 0)
+
+    # Ensure the expiration has not already passed.
+    current_datetime = tuf.formats.unix_timestamp_to_datetime(int(time.time()))
+
+    if expires < current_datetime:
+      raise securesystemslib.exceptions.Error(
+          repr(publickey) + ' has already expired.')
+
+    # Update the key's 'expires' entry.
+    expires = expires.isoformat() + 'Z'
+    publickey['expires'] = expires
+
+    # Ensure 'publickey' is added to 'tuf.keydb.py'.  Keys may be shared, so do
+    # not raise an exception if 'key' has already been loaded.
+    try:
+      tuf.keydb.add_key(publickey, repository_name=self._repository_name)
+
+    except securesystemslib.exceptions.KeyAlreadyExistsError:
+      logger.warning('Adding a verification key that has already been used.')
+
+    keyid = publickey['keyid']
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+
+    # Save the keyids that are being replaced since certain roles will need to
+    # re-sign metadata with these keys (e.g., root).  Use list() to make a copy
+    # of roleinfo['keyids'] to ensure we're modifying distinct lists.
+    previous_keyids = list(roleinfo['keyids'])
+
+    # Add 'key' to the role's entry in 'tuf.roledb.py', and avoid duplicates.
+    if keyid not in roleinfo['keyids']:
+      roleinfo['keyids'].append(keyid)
+      roleinfo['previous_keyids'] = previous_keyids
+
+      tuf.roledb.update_roleinfo(rolename, roleinfo,
+          repository_name=self._repository_name)
 
 
 
