@@ -779,7 +779,7 @@ class Repository(object):
 
 
 
-  def add_target(filepath, custom=None, rolename):
+  def add_target(filepath, rolename, custom=None):
     """
     <Purpose>
       Add the file size and hash(es) of 'filepath' (must be located in the
@@ -810,7 +810,7 @@ class Repository(object):
       improperly formatted.
 
       securesystemslib.exceptions.Error, if 'filepath' is not located in the
-      repository's targets directory.
+      repository's targets directory, or rolename is a non-Targets role.
 
     <Side Effects>
       Updates the metadata for 'rolename' in tuf.roledb.py.
@@ -832,6 +832,10 @@ class Repository(object):
     else:
       tuf.formats.CUSTOM_SCHEMA.check_match(custom)
 
+    if rolename in ['root', 'snapshot', 'timestamp']:
+      raise securesystemslib.exceptions.Error(
+          'The given rolename is a non-Targets role: ' + repr(rolename))
+
     filepath = os.path.join(self._targets_directory, filepath)
 
     # Add 'filepath' (i.e., relative to the targets directory) to 'rolename's
@@ -851,9 +855,9 @@ class Repository(object):
       else:
         logger.debug('Replacing target: ' + repr(relative_path))
 
-      hash_and_size = securesystemslib.util.get_file_details(filepath)
+      file_details = securesystemslib.util.get_file_details(filepath)
       roleinfo['metadata']['targets'][relative_path] = tuf.formats.make_fileinfo(
-          hash_and_size['length'], hash_and_size['hashes'], version=None,
+          file_details['length'], file_details['hashes'], version=None,
           custom=custom)
 
       tuf.roledb.update_roleinfo(rolename, roleinfo,
@@ -863,6 +867,91 @@ class Repository(object):
       raise securesystemslib.exceptions.Error(repr(filepath) + ' is not'
           ' a valid file in the repository\'s targets'
           ' directory: ' + repr(self._targets_directory))
+
+
+
+  def add_targets(list_of_targets, rolename):
+    """
+    <Purpose>
+      Add the length and hash(es) of the targets in 'list_of_targets' (all
+      relative to the repo's targets_directory) to 'rolename'.  This method
+      does not create files on the file system.  The list of targets must
+      already exist on disk.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      list_of_targets:
+        A list of target filepaths.  The length and hashe(es) of each target is
+        added to the metadata of 'rolename'.
+
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+    <Exceptions>
+      securesystemslib.exceptions.FormatError, if the arguments are improperly
+      formatted.
+
+      securesystemslib.exceptions.Error, if any of the paths listed in
+      'list_of_targets' is not located in the repository's targets directory,
+      is invalid, or if rolename is a non-Targets role.
+
+    <Side Effects>
+      The metadata in roledb.py is updated.
+
+    <Returns>
+      None.
+    """
+
+    # Do the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.
+    # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
+    securesystemslib.formats.RELPATHS_SCHEMA.check_match(list_of_targets)
+    securesystemslib.formats.NAME_SCHEMA.check_match(rolename)
+
+    if rolename in ['root', 'snapshot', 'timestamp']:
+      raise securesystemslib.exceptions.Error(
+          'The given rolename is a non-Targets role: ' + repr(rolename))
+
+    # Update the tuf.roledb entry.
+    targets_directory_length = len(self._targets_directory)
+    relative_list_of_targets = []
+
+    # Ensure the paths in 'list_of_targets' are valid and are located in the
+    # repository's targets directory.
+    for target in list_of_targets:
+      filepath = os.path.join(self._targets_directory, target)
+
+      if os.path.isfile(filepath):
+        relative_list_of_targets.append(
+            filepath[targets_directory_length + 1:].replace('\\', '/'))
+
+      else:
+        raise securesystemslib.exceptions.Error(repr(filepath) + ' is not'
+          ' a valid file.')
+
+    # Update 'rolename's entry in 'tuf.roledb.py'.
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+
+    for relative_target in relative_list_of_targets:
+      if relative_target not in roleinfo['metadata']['targets']:
+        logger.debug('Adding new target: ' + repr(relative_target))
+
+      else:
+        logger.debug('Replacing target: ' + repr(relative_target))
+
+      file_details = securesystemslib.util.get_file_details(
+          os.path.join(self._targets_directory, relative_target))
+      roleinfo['metadata']['targets'] = tuf.formats.make_fileinfo(
+          file_details['length'], file_details['hashes'], version=None,
+          custom=None)
+
+    tuf.roledb.update_roleinfo(rolename, roleinfo,
+        repository_name=self._repository_name)
 
 
 
