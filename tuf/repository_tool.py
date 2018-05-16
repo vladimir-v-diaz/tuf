@@ -779,6 +779,91 @@ class Repository(object):
 
 
 
+  def add_target(filepath, custom=None, rolename):
+    """
+    <Purpose>
+      Add the file size and hash(es) of 'filepath' (must be located in the
+      repository's targets directory) to 'rolename's metadata.
+
+      'filepath' must already exist on the file system.  If 'filepath' has
+      already been added, it will be replaced with any new file or 'custom'
+      information.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      filepath:
+        The path of the target file.  It must exist in the repository's targets
+        directory.
+
+      custom:
+        An optional object providing additional information about the file.
+
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+    <Exceptions>
+      securesystemslib.exceptions.FormatError, if any of the arguments are
+      improperly formatted.
+
+      securesystemslib.exceptions.Error, if 'filepath' is not located in the
+      repository's targets directory.
+
+    <Side Effects>
+      Updates the metadata for 'rolename' in tuf.roledb.py.
+
+    <Returns>
+      None.
+    """
+
+    # Do the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.  Raise
+    # 'securesystemslib.exceptions.FormatError' if there is a mismatch.
+    securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
+    securesystemslib.formats.NAME_SCHEMA.check_match(rolename)
+
+    if custom is None:
+      custom = {}
+
+    else:
+      tuf.formats.CUSTOM_SCHEMA.check_match(custom)
+
+    filepath = os.path.join(self._targets_directory, filepath)
+
+    # Add 'filepath' (i.e., relative to the targets directory) to 'rolename's
+    # list of targets.
+    if os.path.isfile(filepath):
+
+      # Update the role's 'tuf.roledb.py' entry and avoid duplicates.  Make
+      # sure to exclude the path separator when calculating the length of the
+      # targets directory.
+      targets_directory_length = len(self._targets_directory) + 1
+      roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+      relative_path = filepath[targets_directory_length:].replace('\\', '/')
+
+      if relative_path not in roleinfo['metadata']['targets']:
+        logger.debug('Adding new target: ' + repr(relative_path))
+
+      else:
+        logger.debug('Replacing target: ' + repr(relative_path))
+
+      hash_and_size = securesystemslib.util.get_file_details(filepath)
+      roleinfo['metadata']['targets'][relative_path] = tuf.formats.make_fileinfo(
+          hash_and_size['length'], hash_and_size['hashes'], version=None,
+          custom=custom)
+
+      tuf.roledb.update_roleinfo(rolename, roleinfo,
+          repository_name=self._repository_name)
+
+    else:
+      raise securesystemslib.exceptions.Error(repr(filepath) + ' is not'
+          ' a valid file in the repository\'s targets'
+          ' directory: ' + repr(self._targets_directory))
+
 
 
   @staticmethod
@@ -2184,9 +2269,9 @@ class Targets(Metadata):
       the Targets object.
 
       This method does not actually create 'filepath' on the file system.
-      'filepath' must already exist on the file system.  If 'filepath'
-      has already been added, it will be replaced with any new file
-      or 'custom' information.
+      'filepath' must already exist on the file system.  If 'filepath' has
+      already been added, it will be replaced with any new file or 'custom'
+      information.
 
       >>>
       >>>
