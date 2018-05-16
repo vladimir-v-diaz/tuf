@@ -721,6 +721,63 @@ class Repository(object):
 
 
 
+  def unload_signing_key(privatekey, rolename):
+    """
+    <Purpose>
+      Remove a previously loaded role private key (i.e., load_signing_key()).
+      The keyid of 'privatekey' is removed from the list of recognized signing
+      keys.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      privatekey:
+        The role key to be unloaded, conformant to
+        'securesystemslib.formats.ANYKEY_SCHEMA'.
+
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+    <Exceptions>
+      securesystemslib.exceptions.FormatError, if any of the aarguments are
+      improperly formatted.
+
+      securesystemslib.exceptions.Error, if the 'privatekey' argument has not
+      been previously loaded.
+
+    <Side Effects>
+      Updates the signing keys of the role in 'tuf.roledb.py'.
+
+    <Returns>
+      None.
+    """
+
+    # Does the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.  Raise
+    # 'securesystemslib.exceptions.FormatError' if any are improperly formatted.
+    securesystemslib.formats.ANYKEY_SCHEMA.check_match(privatekey)
+    securesystemslib.formats.NAMEKEY_SCHEMA.check_match(rolename)
+
+    # Update the role's 'signing_keys' field in 'tuf.roledb.py'.
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+
+    # TODO: Should we consider removing keys from keydb that are no longer
+    # associated with any roles?  There could be many no-longer-used keys
+    # stored in the keydb if not.  For now, just unload the key.
+    if privatekey['keyid'] in roleinfo['signing_keyids']:
+      roleinfo['signing_keyids'].remove(privatekey['keyid'])
+
+      tuf.roledb.update_roleinfo(rolename, roleinfo,
+          repository_name=self._repository_name)
+
+    else:
+      raise securesystemslib.exceptions.Error('Signing key not found.')
+
+
 
 
 
