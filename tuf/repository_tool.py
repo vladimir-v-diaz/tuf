@@ -955,6 +955,50 @@ class Repository(object):
 
 
 
+  def clear_targets(rolename):
+    """
+    <Purpose>
+      Remove all the targets from 'rolename's metadata.
+
+      >>>
+      >>>
+      >>>
+
+    <Arguments>
+      rolename:
+        The rolename (e.g., 'root', 'my_role', 'targets') of the metadata,
+        without a file extension or a prepended consistent hash.
+
+    <Exceptions>
+      securesystemslib.FormatError, if the arguments are improperly formatted.
+
+      securesystemslib.exceptions.Error, if 'rolename' is a non-Targets role.
+
+    <Side Effects>
+      Modifies this Targets' 'tuf.roledb.py' entry.
+
+    <Returns>
+      None.
+    """
+
+    # Do the arguments have the correct format?
+    # Ensure the arguments have the appropriate number of objects and object
+    # types, and that all dict keys are properly named.
+    # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
+    securesystemslib.formats.NAME_SCHEMA.check_match(rolename)
+
+    if rolename in ['root', 'snapshot', 'timestamp']:
+      raise securesystemslib.exceptions.Error(
+          'The given rolename is a non-Targets role: ' + repr(rolename))
+
+    roleinfo = tuf.roledb.get_roleinfo(rolename, self._repository_name)
+    roleinfo['metadata']['targets'] = {}
+
+    tuf.roledb.update_roleinfo(self.rolename, roleinfo,
+        repository_name=self._repository_name)
+
+
+
   @staticmethod
   def get_filepaths_in_directory(files_directory, recursive_walk=False,
       followlinks=True):
