@@ -325,12 +325,14 @@ SIGNABLE_SCHEMA = SCHEMA.Object(
   signed = SCHEMA.Any(),
   signatures = SCHEMA.ListOf(securesystemslib.formats.SIGNATURE_SCHEMA))
 
-# New roledb version...
+# New roledb version...  The ROLEDB_SCHEMA values are optional because they
+# might not all be known initially (e.g., when loading the keyids of the
+# top-level roles specified in Root metadata.
 ROLEDB_SCHEMA = SCHEMA.Object(
   object_name = 'ROLEDB_SCHEMA',
-  metadata = SIGNABLE_SCHEMA,
-  signing_keyids = KEYIDS_SCHEMA,
-  partially_loaded = BOOLEAN_SCHEMA,
+  metadata = SCHEMA.Optional(SIGNABLE_SCHEMA),
+  signing_keyids = SCHEMA.Optional(KEYIDS_SCHEMA),
+  partially_loaded = SCHEMA.Optional(BOOLEAN_SCHEMA),
   # The following attributes might be removed in the future, their
   # corresponding values accessed from metadata instead of being stored here in
   # the roledb object.
