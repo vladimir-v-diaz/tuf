@@ -60,7 +60,7 @@ _keydb_dict = {}
 _keydb_dict['default'] = {}
 
 
-def create_keydb_from_root_metadata(root_metadata, repository_name='default'):
+def create_keydb_from_root_metadata(root_signable, repository_name='default'):
   """
   <Purpose>
     Populate the key database with the unique keys found in 'root_metadata'.
@@ -71,8 +71,8 @@ def create_keydb_from_root_metadata(root_metadata, repository_name='default'):
     match 'RSAKEY_SCHEMA'.
 
   <Arguments>
-    root_metadata:
-      A dictionary conformant to 'tuf.formats.ROOT_SCHEMA'.  The keys found
+    root_signable:
+      A dictionary conformant to 'tuf.formats.SIGNABLE_SCHEMA'.  The keys found
       in the 'keys' field of 'root_metadata' are needed by this function.
 
     repository_name:
@@ -80,10 +80,11 @@ def create_keydb_from_root_metadata(root_metadata, repository_name='default'):
       the key database is populated for the 'default' repository.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if 'root_metadata' does not have the correct format.
+    securesystemslib.exceptions.FormatError, if 'root_metadata' does not have
+    the correct format.
 
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not exist in the key
-    database.
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not
+    exist in the key database.
 
   <Side Effects>
     A function to add the key to the database is called.  In the case of RSA
@@ -95,13 +96,11 @@ def create_keydb_from_root_metadata(root_metadata, repository_name='default'):
     None.
   """
 
-  # Does 'root_metadata' have the correct format?
-  # This check will ensure 'root_metadata' has the appropriate number of objects
-  # and object types, and that all dict keys are properly named.
+  # Do the arguments have the correct format?
+  # This check will ensure that the appropriate number of objects and object
+  # types, and that all dict keys are properly named.
   # Raise 'securesystemslib.exceptions.FormatError' if the check fails.
-  tuf.formats.ROOT_SCHEMA.check_match(root_metadata)
-
-  # Does 'repository_name' have the correct format?
+  tuf.formats.SIGNABLE_SCHEMA.check_match(root_signable)
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
 
   # Clear the key database for 'repository_name', or create it if non-existent.
@@ -110,6 +109,11 @@ def create_keydb_from_root_metadata(root_metadata, repository_name='default'):
 
   else:
     create_keydb(repository_name)
+
+  # Extract the Root metadata and throw a
+  # 'securesystemslib.exceptions.FormatError' if it isn't a ROOT_SCHEMA object.
+  root_metadata = root_signable['signed']
+  tuf.formats.ROOT_SCHEMA.check_match(root_metadata)
 
   # Iterate the keys found in 'root_metadata' by converting them to
   # 'RSAKEY_SCHEMA' if their type is 'rsa', and then adding them to the
@@ -146,7 +150,8 @@ def create_keydb_from_root_metadata(root_metadata, repository_name='default'):
         continue
 
     else:
-      logger.warning('Root Metadata file contains a key with an invalid keytype.')
+      logger.warning(
+          'Root Metadata file contains a key with an invalid keytype.')
 
 
 
@@ -163,9 +168,11 @@ def create_keydb(repository_name):
       may be added to via add_key(keyid, repository_name).
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if 'repository_name' is improperly formatted.
+    securesystemslib.exceptions.FormatError, if 'repository_name' is improperly
+    formatted.
 
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' already exists.
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' already
+    exists.
 
   <Side Effects>
     None.
@@ -174,12 +181,13 @@ def create_keydb(repository_name):
     None.
   """
 
-  # Is 'repository_name' properly formatted?  Raise 'securesystemslib.exceptions.FormatError' if not.
+  # Is 'repository_name' properly formatted?  Raise
+  # 'securesystemslib.exceptions.FormatError' if not.
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
 
   if repository_name in _keydb_dict:
-    raise securesystemslib.exceptions.InvalidNameError('Repository name already exists:'
-      ' ' + repr(repository_name))
+    raise securesystemslib.exceptions.InvalidNameError(
+        'Repository name already exists: ' + repr(repository_name))
 
   _keydb_dict[repository_name] = {}
 
@@ -199,9 +207,11 @@ def remove_keydb(repository_name):
       not be removed, so 'repository_name' cannot be 'default'.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if 'repository_name' is improperly formatted.
+    securesystemslib.exceptions.FormatError, if 'repository_name' is improperly
+    formatted.
 
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' is 'default'.
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' is
+    'default'.
 
   <Side Effects>
     None.
@@ -210,7 +220,8 @@ def remove_keydb(repository_name):
     None.
   """
 
-  # Is 'repository_name' properly formatted?  Raise 'securesystemslib.exceptions.FormatError' if not.
+  # Is 'repository_name' properly formatted?  Raise
+  # 'securesystemslib.exceptions.FormatError' if not.
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
 
   if repository_name not in _keydb_dict:
@@ -218,8 +229,8 @@ def remove_keydb(repository_name):
     return
 
   if repository_name == 'default':
-    raise securesystemslib.exceptions.InvalidNameError('Cannot remove the default repository:'
-      ' ' + repr(repository_name))
+    raise securesystemslib.exceptions.InvalidNameError(
+        'Cannot remove the default repository: ' + repr(repository_name))
 
   del _keydb_dict[repository_name]
 
@@ -252,14 +263,17 @@ def add_key(key_dict, keyid=None, repository_name='default'):
       added to the 'default' repository.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if the arguments do not have the correct format.
+    securesystemslib.exceptions.FormatError, if the arguments do not have the
+    correct format.
 
-    securesystemslib.exceptions.Error, if 'keyid' does not match the keyid for 'rsakey_dict'.
+    securesystemslib.exceptions.Error, if 'keyid' does not match the keyid for
+    'rsakey_dict'.
 
-    securesystemslib.exceptions.KeyAlreadyExistsError, if 'rsakey_dict' is found in the key database.
+    securesystemslib.exceptions.KeyAlreadyExistsError, if 'rsakey_dict' is
+    found in the key database.
 
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not exist in the key
-    database.
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not
+    exist in the key database.
 
   <Side Effects>
     The keydb key database is modified.
@@ -284,12 +298,13 @@ def add_key(key_dict, keyid=None, repository_name='default'):
 
     # Check if each keyid found in 'key_dict' matches 'keyid'.
     if keyid != key_dict['keyid']:
-      raise securesystemslib.exceptions.Error('Incorrect keyid.  Got ' + key_dict['keyid'] + ' but expected ' + keyid)
+      raise securesystemslib.exceptions.Error(
+          'Incorrect keyid.  Got ' + key_dict['keyid'] + ' but expected ' + keyid)
 
   # Ensure 'repository_name' is actually set in the key database.
   if repository_name not in _keydb_dict:
-    raise securesystemslib.exceptions.InvalidNameError('Repository name does not exist:'
-      ' ' + repr(repository_name))
+    raise securesystemslib.exceptions.InvalidNameError(
+        'Repository name does not exist: ' + repr(repository_name))
 
   # Check if the keyid belonging to 'key_dict' is not already
   # available in the key database before returning.
@@ -310,20 +325,22 @@ def get_key(keyid, repository_name='default'):
 
   <Arguments>
     keyid:
-      An object conformant to 'securesystemslib.formats.KEYID_SCHEMA'.  It is used as an
-      identifier for keys.
+      An object conformant to 'securesystemslib.formats.KEYID_SCHEMA'.  It is
+      used as an identifier for keys.
 
     repository_name:
       The name of the repository to get the key.  If not supplied, the key is
       retrieved from the 'default' repository.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if the arguments do not have the correct format.
+    securesystemslib.exceptions.FormatError, if the arguments do not have the
+    correct format.
 
-    securesystemslib.exceptions.UnknownKeyError, if 'keyid' is not found in the keydb database.
+    securesystemslib.exceptions.UnknownKeyError, if 'keyid' is not found in the
+    keydb database.
 
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not exist in the key
-    database.
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not
+    exist in the key database.
 
   <Side Effects>
     None.
@@ -343,8 +360,8 @@ def get_key(keyid, repository_name='default'):
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
 
   if repository_name not in _keydb_dict:
-    raise securesystemslib.exceptions.InvalidNameError('Repository name does not exist:'
-      ' ' + repr(repository_name))
+    raise securesystemslib.exceptions.InvalidNameError(
+        'Repository name does not exist: ' + repr(repository_name))
 
   # Return the key belonging to 'keyid', if found in the key database.
   try:
@@ -364,20 +381,22 @@ def remove_key(keyid, repository_name='default'):
 
   <Arguments>
     keyid:
-      An object conformant to 'securesystemslib.formats.KEYID_SCHEMA'.  It is used as an
-      identifier for keys.
+      An object conformant to 'securesystemslib.formats.KEYID_SCHEMA'.  It is
+      used as an identifier for keys.
 
     repository_name:
       The name of the repository to remove the key.  If not supplied, the key
       is removed from the 'default' repository.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if the arguments do not have the correct format.
+    securesystemslib.exceptions.FormatError, if the arguments do not have the
+    correct format.
 
-    securesystemslib.exceptions.UnknownKeyError, if 'keyid' is not found in key database.
-
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not exist in the key
+    securesystemslib.exceptions.UnknownKeyError, if 'keyid' is not found in key
     database.
+
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not
+    exist in the key database.
 
   <Side Effects>
     The key, identified by 'keyid', is deleted from the key database.
@@ -396,8 +415,8 @@ def remove_key(keyid, repository_name='default'):
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
 
   if repository_name not in _keydb_dict:
-    raise securesystemslib.exceptions.InvalidNameError('Repository name does not exist:'
-      ' ' + repr(repository_name))
+    raise securesystemslib.exceptions.InvalidNameError(
+        'Repository name does not exist: ' + repr(repository_name))
 
   # Remove the key belonging to 'keyid' if found in the key database.
   if keyid in _keydb_dict[repository_name]:
@@ -425,10 +444,11 @@ def clear_keydb(repository_name='default', clear_all=False):
       Boolean indicating whether to clear the entire keydb.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if 'repository_name' is improperly formatted.
+    securesystemslib.exceptions.FormatError, if 'repository_name' is improperly
+    formatted.
 
-    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not exist in the key
-    database.
+    securesystemslib.exceptions.InvalidNameError, if 'repository_name' does not
+    exist in the key database.
 
   <Side Effects>
     The keydb key database is reset.
@@ -437,8 +457,9 @@ def clear_keydb(repository_name='default', clear_all=False):
     None.
   """
 
-  # Do the arguments have the correct format?  Raise 'securesystemslib.exceptions.FormatError' if
-  # 'repository_name' is improperly formatted.
+  # Do the arguments have the correct format?  Raise
+  # 'securesystemslib.exceptions.FormatError' if the arguments are
+  # improperly formatted.
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
   securesystemslib.formats.BOOLEAN_SCHEMA.check_match(clear_all)
 
@@ -449,7 +470,7 @@ def clear_keydb(repository_name='default', clear_all=False):
     _keydb_dict['default'] = {}
 
   if repository_name not in _keydb_dict:
-    raise securesystemslib.exceptions.InvalidNameError('Repository name does not exist:'
-      ' ' + repr(repository_name))
+    raise securesystemslib.exceptions.InvalidNameError(
+        'Repository name does not exist: ' + repr(repository_name))
 
   _keydb_dict[repository_name] = {}
