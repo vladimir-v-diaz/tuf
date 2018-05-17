@@ -27,18 +27,16 @@
   Update Framework process maintains a role database for each repository.
 
   The role database is a dictionary conformant to
-  'tuf.formats.ROLEDICT_SCHEMA' and has the form:
+  'tuf.formats.ROLEDB_SCHEMA' and has the form:
 
-  {'repository_name': {
-      'rolename': {'keyids': ['34345df32093bd12...'],
-          'threshold': 1
-          'signatures': ['abcd3452...'],
-          'paths': ['role.json'],
-          'path_hash_prefixes': ['ab34df13'],
-          'delegations': {'keys': {}, 'roles': {}}}
+  {
+    'metadata': SIGNABLE_SCHEMA,
+    'keyids': ['1b8f..', '4cc3..'],
+    'previous_keyids': ['abc43'],
+    'signing_keyids': ['1b8f..', '4cc3..'],
+    'partially_loaded': BOOLEAN,
+  }
 
-  The 'name', 'paths', 'path_hash_prefixes', and 'delegations' dict keys are
-  optional.
 """
 
 # Help with Python 3 compatibility, where the print statement is a function, an
@@ -73,28 +71,28 @@ _dirty_roles = {}
 _dirty_roles['default'] = set()
 
 
-def create_roledb_from_root_metadata(root_metadata, repository_name='default'):
+def create_roledb_from_root_metadata(root_signable, repository_name='default'):
   """
   <Purpose>
     Create a role database containing all of the unique roles found in
     'root_metadata'.
 
   <Arguments>
-    root_metadata:
-      A dictionary conformant to 'tuf.formats.ROOT_SCHEMA'.  The
-      roles found in the 'roles' field of 'root_metadata' is needed by this
+    root_signable:
+      A dictionary conformant to 'tuf.formats.SIGNABLE_SCHEMA'.  The
+      roles found in the 'roles' field of 'root_signable' are needed by this
       function.
 
     repository_name:
-      The name of the repository to store 'root_metadata'.  If not supplied,
+      The name of the repository to store 'root_signable'.  If not supplied,
       'rolename' is added to the 'default' repository.
 
   <Exceptions>
-    securesystemslib.exceptions.FormatError, if 'root_metadata' does not have
+    securesystemslib.exceptions.FormatError, if 'root_signable' does not have
     the correct object format.
 
     securesystemslib.exceptions.Error, if one of the roles found in
-    'root_metadata' contains an invalid delegation (i.e., a nonexistent parent
+    'root_signable' contains an invalid delegation (i.e., a nonexistent parent
     role).
 
   <Side Effects>
@@ -104,11 +102,11 @@ def create_roledb_from_root_metadata(root_metadata, repository_name='default'):
     None.
   """
 
-  # Does 'root_metadata' have the correct object format?
-  # This check will ensure 'root_metadata' has the appropriate number of objects
-  # and object types, and that all dict keys are properly named.
+  # Do the arguments have the correct object format?
+  # This check will ensure that the appropriate number of objects and object
+  # types, and that all dict keys are properly named.
   # Raises securesystemslib.exceptions.FormatError.
-  tuf.formats.ROOT_SCHEMA.check_match(root_metadata)
+  tuf.formats.SIGNABLE_SCHEMA.check_match(root_signable)
 
   # Is 'repository_name' formatted correctly?
   securesystemslib.formats.NAME_SCHEMA.check_match(repository_name)
@@ -125,25 +123,25 @@ def create_roledb_from_root_metadata(root_metadata, repository_name='default'):
   _roledb_dict[repository_name] = {}
   _dirty_roles[repository_name] = set()
 
-  # Do not modify the contents of the 'root_metadata' argument.
-  root_metadata = copy.deepcopy(root_metadata)
+  # Do not modify the contents of the 'root_signable' argument.
+  root_signable = copy.deepcopy(root_signable)
+
+  # Extract the metadata portion and throw a
+  # 'secureystemslib.exceptions.FormatError' if the metadata is not a
+  # ROOT_SCHEMA.
+  root_metadata = root_signable['signed']
+  tuf.formats.SIGNABLE_SCHEMA.check_match(root_signable)
 
   # Iterate the roles found in 'root_metadata' and add them to '_roledb_dict'.
   # Duplicates are avoided.
   for rolename, roleinfo in six.iteritems(root_metadata['roles']):
     if rolename == 'root':
-      roleinfo['version'] = root_metadata['version']
-      roleinfo['expires'] = root_metadata['expires']
-      roleinfo['previous_keyids'] = roleinfo['keyids']
-      roleinfo['previous_threshold'] = roleinfo['threshold']
+      roleinfo['metadata'] = root_signable
 
-    roleinfo['signatures'] = []
+    roleinfo['keyids'] = roleinfo['keyids']
+    roleinfo['previous_keyids'] = []
     roleinfo['signing_keyids'] = []
-    roleinfo['partial_loaded'] = False
-
-    if rolename.startswith('targets'):
-      roleinfo['paths'] = {}
-      roleinfo['delegations'] = {'keys': {}, 'roles': []}
+    roleinfo['partially_loaded'] = False
 
     add_role(rolename, roleinfo, repository_name)
 
