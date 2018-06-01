@@ -244,10 +244,12 @@ def _download_file(url, required_length, STRICT_REQUIRED_LENGTH=True):
   securesystemslib.formats.URL_SCHEMA.check_match(url)
   securesystemslib.formats.LENGTH_SCHEMA.check_match(required_length)
 
-  # 'url.replace()' is for compatibility with Windows-based systems because
-  # they might put back-slashes in place of forward-slashes.  This converts it
-  # to the common format.
-  url = url.replace('\\', '/')
+  # 'url.replace('\\', '/')' is needed for compatibility with Windows-based
+  # systems, because they might use back-slashes in place of forward-slashes.
+  # This converts it to the common format.  unquote() replaces %xx escapes in a
+  # url with their single-character equivalent.  A back-slash may be encoded as
+  # %5c in the url, which should also be replaced with a forward slash.
+  url = six.moves.urllib.parse.unquote(url).replace('\\', '/')
   logger.info('Downloading: ' + repr(url))
 
   # This is the temporary file that we will return to contain the contents of
@@ -255,7 +257,10 @@ def _download_file(url, required_length, STRICT_REQUIRED_LENGTH=True):
   temp_file = securesystemslib.util.TempFile()
 
   try:
-    # Open the connection to the remote file.
+    # Open the connection to the remote file.  _open_connection() can raise
+    # socket connection exceptions (such as SSLError).  Connection errors of
+    # this kind can be minimized by adjusting the socket timeout in
+    # settings.py.
     connection = _open_connection(url)
 
     # We ask the server about how big it thinks this file should be.
