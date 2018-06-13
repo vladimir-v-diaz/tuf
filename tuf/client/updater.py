@@ -88,20 +88,28 @@
   # copies of the metadata files.
   updater.refresh()
 
-  # The target file information for all the repository targets is determined.
-  targets = updater.all_targets()
+  # get_one_valid_targetinfo() updates role metadata when required.  In other
+  # words, if the client doesn't possess the metadata that lists 'LICENSE.txt',
+  # get_one_valid_targetinfo() will try to fetch / update it.
+  target = updater.get_one_valid_targetinfo('LICENSE.txt')
 
-  # Among these targets, determine the ones that have changed since the client's
-  # last refresh().  A target is considered updated if it does not exist in
+  # Determine if 'target' has changed since the client's last refresh().  A
+  # target is considered updated if it does not exist in
   # 'destination_directory' (current directory) or the target located there has
   # changed.
   destination_directory = '.'
-  updated_targets = updater.updated_targets(targets, destination_directory)
+  updated_target = updater.updated_targets([target], destination_directory)
 
-  # Lastly, attempt to download each target among those that have changed.
-  # The updated target files are saved locally to 'destination_directory'.
-  for target in updated_targets:
+  for target in updated_target:
     updater.download_target(target, destination_directory)
+    # Client code here may also reference target information (including
+    # 'custom') by directly accessing the dictionary entries of the target.
+    # The 'custom' entry is additional file information explicitly set by the
+    # remote repository.
+    target_path = target['filepath']
+    target_length = target['fileinfo']['length']
+    target_hashes = target['fileinfo']['hashes']
+    target_custom_data = target['fileinfo']['custom']
 """
 
 # Help with Python 3 compatibility, where the print statement is a function, an
@@ -119,6 +127,7 @@ import shutil
 import time
 import fnmatch
 import copy
+import warnings
 
 import tuf
 import tuf.download
@@ -588,18 +597,9 @@ class Updater(object):
       The expiration time for downloaded metadata is also verified.
 
       The metadata for delegated roles are not refreshed by this method, but by
-      the target methods (e.g., all_targets(), targets_of_role(),
-      get_one_valid_targetinfo()).  The refresh() method should be called by
-      the client before any target requests.
-
-    all_targets():
-      Returns the target information for the 'targets' and delegated roles.
-      Prior to extracting the target information, this method attempts a file
-      download of all the target metadata that have changed.
-
-    targets_of_role('targets'):
-      Returns the target information for the targets of a specified role.
-      Like all_targets(), delegated metadata is updated if it has changed.
+      the method that returns targetinfo (i.e., get_one_valid_targetinfo()).
+      The refresh() method should be called by the client before any target
+      requests.
 
     get_one_valid_targetinfo(file_path):
       Returns the target information for a specific file identified by its file
@@ -633,12 +633,12 @@ class Updater(object):
     """
     <Purpose>
       Constructor.  Instantiating an updater object causes all the metadata
-      files for the top-level roles to be read from disk, including the key
-      and role information for the delegated targets of 'targets'.  The actual
-      metadata for delegated roles is not loaded in __init__.  The metadata
-      for these delegated roles, including nested delegated roles, are
-      loaded, updated, and saved to the 'self.metadata' store by the target
-      methods, like all_targets() and targets_of_role().
+      files for the top-level roles to be read from disk, including the key and
+      role information for the delegated targets of 'targets'.  The actual
+      metadata for delegated roles is not loaded in __init__.  The metadata for
+      these delegated roles, including nested delegated roles, are loaded,
+      updated, and saved to the 'self.metadata' store, as needed, by
+      get_one_valid_targetinfo().
 
       The initial set of metadata files are provided by the software update
       system utilizing TUF.
@@ -873,8 +873,9 @@ class Updater(object):
       Non-public method that rebuilds the key and role databases from the
       currently trusted 'root' metadata object extracted from 'root.json'.
       This private method is called when a new/updated 'root' metadata file is
-      loaded.  This method will only store the role information of the
-      top-level roles (i.e., 'root', 'targets', 'snapshot', 'timestamp').
+      loaded or when updater.refresh() is called.  This method will only store
+      the role information of the top-level roles (i.e., 'root', 'targets',
+      'snapshot', 'timestamp').
 
     <Arguments>
       None.
@@ -896,13 +897,14 @@ class Updater(object):
 
     # Clobbering this means all delegated metadata files are rendered outdated
     # and will need to be reloaded.  However, reloading the delegated metadata
-    # files is avoided here because fetching target information with methods
-    # like all_targets() and get_one_valid_targetinfo() always cause a refresh
-    # of these files.  The metadata files for delegated roles are also not
-    # loaded when the repository is first instantiated.  Due to this setup,
-    # reloading delegated roles is not required here.
+    # files is avoided here because fetching target information with
+    # get_one_valid_targetinfo() always causes a refresh of these files.  The
+    # metadata files for delegated roles are also not loaded when the
+    # repository is first instantiated.  Due to this setup, reloading delegated
+    # roles is not required here.
     tuf.keydb.create_keydb_from_root_metadata(self.metadata['current']['root'],
         self.repository_name)
+
     tuf.roledb.create_roledb_from_root_metadata(self.metadata['current']['root'],
         self.repository_name)
 
@@ -1007,8 +1009,7 @@ class Updater(object):
       timestamp -> snapshot -> root (if necessary) -> targets.
 
       Delegated metadata is not refreshed by this method. After this method is
-      called, the use of target methods (e.g., all_targets(),
-      targets_of_role(), or get_one_valid_targetinfo()) will update delegated
+      called, the use of get_one_valid_targetinfo() will update delegated
       metadata, when required.  Calling refresh() ensures that top-level
       metadata is up-to-date, so that the target methods can refer to the
       latest available content. Thus, refresh() should always be called by the
@@ -1081,9 +1082,21 @@ class Updater(object):
     # do we blindly trust the downloaded root metadata here?
     self._update_root_metadata(root_metadata)
 
+    # Ensure that the role and key information of the top-level roles is the
+    # latest.  We do this whether or not Root needed to be updated, in order to
+    # ensure that, e.g., the entries in roledb for top-level roles are
+    # populated with expected keyid info so that roles can be validated.  In
+    # certain circumstances, top-level metadata might be missing because it was
+    # marked obsolete and deleted after a failed attempt, and thus we should
+    # refresh them here as a protective measure.  See Issue #736.
+    self._rebuild_key_and_role_db()
+    self.consistent_snapshot = \
+        self.metadata['current']['root']['consistent_snapshot']
+
     # Use default but sane information for timestamp metadata, and do not
     # require strict checks on its required length.
     self._update_metadata('timestamp', DEFAULT_TIMESTAMP_UPPERLENGTH)
+
     # TODO: After fetching snapshot.json, we should either verify the root
     # fileinfo referenced there matches what was fetched earlier in
     # _update_root_metadata() or make another attempt to download root.json.
@@ -1663,10 +1676,12 @@ class Updater(object):
     """
     <Purpose>
       Non-public method that downloads, verifies, and 'installs' the metadata
-      belonging to 'metadata_role'.  Calling this method implies the metadata
-      has been updated by the repository and thus needs to be re-downloaded.
-      The current and previous metadata stores are updated if the newly
-      downloaded metadata is successfully downloaded and verified.
+      belonging to 'metadata_role'.  Calling this method implies that the
+      'metadata_role' on the repository is newer than the client's, and thus
+      needs to be re-downloaded.  The current and previous metadata stores are
+      updated if the newly downloaded metadata is successfully downloaded and
+      verified.  This method also assumes that the store of top-level metadata
+      is the latest and exists.
 
     <Arguments>
       metadata_role:
@@ -1772,12 +1787,6 @@ class Updater(object):
     self.metadata['previous'][metadata_role] = current_metadata_object
     self.metadata['current'][metadata_role] = updated_metadata_object
     self._update_versioninfo(metadata_filename)
-
-    # Ensure the role and key information of the top-level roles is also updated
-    # according to the newly-installed Root metadata.
-    if metadata_role == 'root':
-      self._rebuild_key_and_role_db()
-      self.consistent_snapshot = updated_metadata_object['consistent_snapshot']
 
 
 
@@ -2370,6 +2379,11 @@ class Updater(object):
      'tuf.formats.TARGETINFOS_SCHEMA'.
     """
 
+    warnings.warn(
+        'Support for all_targets() will be removed in a future release.'
+        '  get_one_valid_targetinfo() should be used instead.',
+        DeprecationWarning)
+
     # Load the most up-to-date targets of the 'targets' role and all
     # delegated roles.
     self._refresh_targets_metadata(refresh_all_delegated_roles=True)
@@ -2405,8 +2419,8 @@ class Updater(object):
       refresh() by the _update_metadata_if_changed('targets') call, not here.
       Delegated roles are not loaded when the repository is first initialized.
       They are loaded from disk, updated if they have changed, and stored to
-      the 'self.metadata' store by this method.  This method is called by the
-      target methods, like all_targets() and targets_of_role().
+      the 'self.metadata' store by this method.  This method is called by
+      get_one_valid_targetinfo().
 
     <Arguments>
       rolename:
@@ -2580,14 +2594,19 @@ class Updater(object):
       'tuf.formats.TARGETINFOS_SCHEMA'.
     """
 
+    warnings.warn(
+        'Support for targets_of_role() will be removed in a future release.'
+        '  get_one_valid_targetinfo() should be used instead.',
+        DeprecationWarning)
+
     # Does 'rolename' have the correct format?
     # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
     securesystemslib.formats.RELPATH_SCHEMA.check_match(rolename)
 
+    self._refresh_targets_metadata(refresh_all_delegated_roles=True)
+
     if not tuf.roledb.role_exists(rolename, self.repository_name):
       raise tuf.exceptions.UnknownRoleError(rolename)
-
-    self._refresh_targets_metadata(rolename)
 
     return self._targets_of_role(rolename, skip_refresh=True)
 
